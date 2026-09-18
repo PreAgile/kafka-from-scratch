@@ -1,0 +1,74 @@
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  learning-gate:
+    name: 학습 절차 게이트
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 규칙 검사
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: python3 .github/scripts/learning_gate.py
+
+  build-and-test:
+    name: 빌드와 테스트
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: 빌드 대상 확인
+        id: probe
+        run: |
+          if [ -f pom.xml ]; then echo "found=true" >> "$GITHUB_OUTPUT"
+          else echo "found=false" >> "$GITHUB_OUTPUT"; echo "루트에 pom.xml 이 아직 없습니다. Level 1 시작 전이면 정상입니다."; fi
+      - name: 빌드와 단위 테스트
+        if: steps.probe.outputs.found == 'true'
+        run: mvn -B -ntp verify
+      - name: 테스트 리포트 업로드
+        if: steps.probe.outputs.found == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: "**/target/surefire-reports/**"
+          if-no-files-found: ignore
+
+  simulation-sweep:
+    name: 시뮬레이터 시드 스윕 (짧게)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: 시뮬레이터 존재 확인
+        id: probe
+        run: |
+          if [ -f pom.xml ] && [ -d simulation ]; then echo "found=true" >> "$GITHUB_OUTPUT"
+          else echo "found=false" >> "$GITHUB_OUTPUT"; echo "시뮬레이터가 아직 없습니다. 이슈 #14 전이면 정상입니다."; fi
+      - name: 시드 200개 실행
+        if: steps.probe.outputs.found == 'true'
+        run: mvn -B -ntp -pl simulation test -Dsim.seeds=200 -Dsim.failFast=true
+      - name: 실패 시드 리포트 업로드
+        if: steps.probe.outputs.found == 'true' && failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failing-seeds
+          path: simulation/target/seeds/**
+          if-no-files-found: ignore

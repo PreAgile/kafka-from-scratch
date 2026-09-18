@@ -1,0 +1,50 @@
+name: nightly-sweep
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 매일 03:00 KST
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: 실행할 시드 수
+        default: "20000"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sweep:
+    name: 대량 시드 스윕
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - id: probe
+        run: |
+          if [ -f pom.xml ] && [ -d simulation ]; then echo "found=true" >> "$GITHUB_OUTPUT"
+          else echo "found=false" >> "$GITHUB_OUTPUT"; fi
+      - name: 시드 스윕
+        if: steps.probe.outputs.found == 'true'
+        run: mvn -B -ntp -pl simulation test -Dsim.seeds=${{ inputs.seeds || '20000' }} -Dsim.failFast=false
+      - name: 결과 업로드
+        if: steps.probe.outputs.found == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-seeds
+          path: simulation/target/seeds/**
+          if-no-files-found: ignore
+      - name: 불변식 위반이 나오면 이슈 생성
+        if: steps.probe.outputs.found == 'true' && failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "[시뮬레이션] 불변식 위반 시드 발견 ($(date +%F))" \
+            --label "level-3,test,severity-A" \
+            --body "$(printf '야간 스윕에서 불변식 위반이 나왔습니다.\n\n실행: %s\n\n실패 시드와 이벤트 순서는 워크플로 아티팩트 `nightly-seeds` 에 있습니다.\n\n## 할 일\n\n- [ ] 시드를 로컬에서 재현\n- [ ] 이벤트 순서를 읽고 어느 불변식이 어떻게 깨졌는지 서술\n- [ ] 그 시드를 회귀 테스트로 고정\n- [ ] 원인 수정\n' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"

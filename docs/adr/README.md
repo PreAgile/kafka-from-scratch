@@ -15,5 +15,6 @@
 | [0001](0001-fsync-policy.md) | append마다 fsync하지 않는다 | 초안 |
 | [0002](0002-stop-at-level-3.md) | Level 3에서 멈추고 그 이상은 문서로만 다룬다 | 확정 |
 | [0003](0003-deterministic-simulation.md) | 분산 테스트는 실제 클러스터 대신 결정론적 시뮬레이션으로 한다 | 확정 |
+| [0004](0004-review-harness.md) | 리뷰 봇에게 답을 주지 못하게 막는다 | 확정 |
 
 새로 쓸 때는 [TEMPLATE.md](TEMPLATE.md)를 복사합니다.

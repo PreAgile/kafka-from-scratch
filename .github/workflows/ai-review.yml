@@ -1,0 +1,94 @@
+name: ai-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  concept-gap:
+    name: 개념 갭 리뷰
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 인증 수단 확인
+        id: auth
+        env:
+          OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          APIKEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$OAUTH" ] || [ -n "$APIKEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "리뷰 토큰이 없어 건너뜁니다. docs/review-harness.md 의 설정 절차를 보세요."; fi
+      - name: 프롬프트 조립
+        if: steps.auth.outputs.ok == 'true'
+        id: prompt
+        run: |
+          {
+            echo 'text<<PROMPT_EOF'
+            cat .github/review-prompts/concept-gap.md
+            echo
+            echo "이 PR 을 위 역할로 리뷰하고, 결과를 PR 코멘트로 남겨라."
+            echo "PROMPT_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Claude 리뷰
+        if: steps.auth.outputs.ok == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          use_sticky_comment: true
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git log:*),Bash(git diff:*)"
+
+  adversary:
+    name: 적대적 검증
+    if: |
+      github.event_name == 'issue_comment'
+      && github.event.issue.pull_request != null
+      && contains(github.event.comment.body, '/adversary')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 인증 수단 확인
+        id: auth
+        env:
+          OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          APIKEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$OAUTH" ] || [ -n "$APIKEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+      - name: 프롬프트 조립
+        if: steps.auth.outputs.ok == 'true'
+        id: prompt
+        run: |
+          {
+            echo 'text<<PROMPT_EOF'
+            cat .github/review-prompts/adversary.md
+            echo
+            echo "PR #${{ github.event.issue.number }} 를 위 역할로 공격하고, 결과를 PR 코멘트로 남겨라."
+            echo "PROMPT_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Claude 적대적 검증
+        if: steps.auth.outputs.ok == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git log:*),Bash(git diff:*)"

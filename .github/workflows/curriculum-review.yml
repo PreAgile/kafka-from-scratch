@@ -1,0 +1,46 @@
+name: curriculum-review
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"   # 매주 월요일 09:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    name: 커리큘럼 검토
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 인증 수단 확인
+        id: auth
+        env:
+          OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          APIKEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$OAUTH" ] || [ -n "$APIKEY" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+      - name: 프롬프트 조립
+        if: steps.auth.outputs.ok == 'true'
+        id: prompt
+        run: |
+          {
+            echo 'text<<PROMPT_EOF'
+            cat .github/review-prompts/curriculum.md
+            echo
+            echo "검토 결과를 'curriculum-review' 라벨을 단 새 이슈 하나로 만들어라."
+            echo "제목은 '[커리큘럼 검토] YYYY-MM-DD' 형식으로 한다."
+            echo "지난 검토 이슈가 있으면 먼저 읽고, 이미 지적한 것은 반복하지 말고 진척만 짧게 언급해라."
+            echo "PROMPT_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: anthropics/claude-code-action@v1
+        if: steps.auth.outputs.ok == 'true'
+        with:
+          prompt: ${{ steps.prompt.outputs.text }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*)"
