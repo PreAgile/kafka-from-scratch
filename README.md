@@ -81,13 +81,15 @@ Level 4를 구현하지 않는 이유는 [ADR 0002](docs/adr/0002-stop-at-level-
 | 기계 게이트 | PR마다 | 학습 절차 검사, 빌드, 짧은 시드 스윕 |
 | 다관점 AI 리뷰 | PR 열 때 + 코멘트 요청 | Claude(개념 갭) + Codex(불변식 공격) + CodeRabbit(코드 품질) |
 | 적대적 검증 | `/adversary` 코멘트 | 반례 사냥 |
-| 로컬 커맨드 | 구현 전후 | `/design-review`, `/adversary`, `/explain-check`, `/kafka-diff`, `/second-opinion` |
+| 로컬 커맨드 | 구현 전후 | `/design-review`, `/adversary`, `/codex-review`, `/explain-check`, `/kafka-diff`, `/second-opinion` |
 | 커리큘럼 검토 | 주 1회 | 커리큘럼 자체의 빈틈을 이슈로 |
 | 야간 시드 스윕 | 매일 | 2만 시드, 위반 시 이슈 자동 생성 |
 
 리뷰의 주 입력은 diff가 아니라 PR 본문의 **백지 설명**입니다. 코드를 보지 않고 쓴 자기 설명과 실제 코드의 괴리가 곧 자각하지 못한 잘못된 모델입니다.
 
 리뷰어 셋은 계보가 다른 모델이고, 규칙을 읽는 위치도 각각 다릅니다. Claude 는 `.github/review-prompts/`, Codex 는 `AGENTS.md`의 `## Code Review Rules`, CodeRabbit 은 `.coderabbit.yaml` 입니다. 세 곳 모두에 수정안 생성 금지를 박아 두었습니다.
+
+셋 다 개인 구독이나 무료 등급으로 돕니다. API 키는 쓰지 않습니다. Codex 는 GitHub Actions 가 API 키만 지원해서, 클라우드 연동과 로컬 `codex review` CLI 두 경로로 씁니다.
 
 설정 방법과 한계는 [docs/review-harness.md](docs/review-harness.md)에 있습니다.
 

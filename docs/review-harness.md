@@ -48,11 +48,16 @@ PR 템플릿의 첫 칸이 `## 백지 설명` 입니다. 코드를 보지 않고
 
 서로 다른 계보의 모델을 셋 붙입니다. **같은 모델에게 두 번 물으면 같은 사각지대가 두 번 나오기 때문** 입니다.
 
-| 리뷰어 | 역할 | 실제 비용 | 규칙을 주는 곳 |
-|---|---|---|---|
-| Claude | 백지 설명과 코드의 괴리, 빠진 개념, 검증 안 된 불변식 | Claude 개인 구독 차감 | `.github/review-prompts/concept-gap.md` |
-| Codex | 불변식 공격, 데이터 유실 시나리오 | ChatGPT 개인 구독 차감 | `AGENTS.md` 의 `## Code Review Rules` |
-| CodeRabbit | 코드 품질, 실제 버그, 라인별 코멘트 | 공개 저장소 무료 | `.coderabbit.yaml` |
+| 리뷰어 | 어디서 도는가 | 역할 | 실제 비용 | 규칙을 주는 곳 |
+|---|---|---|---|---|
+| Claude | GitHub Actions | 백지 설명과 코드의 괴리, 빠진 개념, 검증 안 된 불변식 | Claude 구독 차감 | `.github/review-prompts/concept-gap.md` |
+| Codex (클라우드) | GitHub 앱 | `@codex review` 로 불러 쓰는 PR 리뷰 | ChatGPT 구독 차감 | `AGENTS.md` 의 `## Code Review Rules` |
+| Codex (로컬) | 내 터미널 | 불변식 공격. PR 올리기 전에 돌림 | ChatGPT 구독 차감 | 같은 `AGENTS.md` |
+| CodeRabbit | GitHub 앱 | 코드 품질, 실제 버그, 라인별 코멘트 | 공개 저장소 무료 | `.coderabbit.yaml` |
+
+Codex 는 세 번째 줄이 중요합니다. **`openai/codex-action` 은 `openai-api-key` 만 받습니다.** OAuth 나 구독 인증을 지원하지 않아서, GitHub Actions 로 Codex 를 돌리려면 종량 과금 API 키가 필요합니다. 그래서 이 저장소는 Actions 용 Codex 워크플로를 두지 않습니다.
+
+대신 두 경로를 씁니다. 클라우드 쪽은 ChatGPT 의 GitHub 연동이라 구독으로 돌고, 로컬 쪽은 `codex review` CLI 라 역시 구독으로 돕니다. 둘 다 API 키가 없습니다.
 
 셋 다 계보가 다른 모델입니다. 같은 모델에 두 번 물으면 같은 사각지대가 두 번 나오기 때문에 이게 요점입니다.
 
@@ -155,7 +160,23 @@ gh secret set CLAUDE_CODE_OAUTH_TOKEN -R PreAgile/kafka-from-scratch
 
 시크릿이 없으면 AI 리뷰 잡은 **조용히 건너뜁니다.** 층 0 의 기계 게이트는 그대로 돕니다.
 
-### 2. Codex 리뷰 켜기
+### 2-1. Codex 로컬 리뷰 (설정 없음, 지금 바로 됨)
+
+`codex` CLI 가 ChatGPT 로 로그인되어 있으면 추가 설정이 없습니다.
+
+```bash
+scripts/codex-review.sh                  # 현재 브랜치를 main 과 비교
+scripts/codex-review.sh --uncommitted    # 커밋 전 작업 트리
+scripts/codex-review.sh --post 28        # 리뷰 후 PR #28 에 게시
+```
+
+Claude Code 안에서는 `/codex-review` 로 부릅니다. 결과를 확실히 깨짐, 확인 필요, 오판으로 분류하고 확실한 것만 재현 테스트까지 만들도록 커맨드에 절차를 넣어 두었습니다.
+
+`codex review` 는 저장소의 `AGENTS.md` 를 자동으로 읽으므로, 수정안 금지 규칙이 클라우드 쪽과 동일하게 적용됩니다. 규칙을 한 곳에서 관리할 수 있다는 뜻입니다.
+
+**이 경로가 PR 올리기 전 단계의 주력입니다.** CI 를 기다릴 필요가 없고, 반례를 찾으면 그 자리에서 테스트를 만들어 확인할 수 있습니다.
+
+### 2-2. Codex 클라우드 리뷰 켜기
 
 워크플로 파일이 아니라 설정 페이지에서 켭니다. GitHub Actions 를 쓰지 않으므로 시크릿도 필요 없습니다.
 
@@ -177,11 +198,63 @@ ChatGPT 개인 구독 사용량에서 차감됩니다. Claude 와 마찬가지�
 
 ### 3. CodeRabbit
 
-이미 설치되어 있습니다. PR #25 에서 자동으로 붙어 코멘트를 남기는 것을 확인했습니다.
+앱은 이미 설치되어 있습니다. PR #25 에서 자동으로 붙어 코멘트를 남기는 것을 확인했습니다.
 
 공개 저장소는 신청이나 승인 대기 없이 Pro 기능이 무료로 켜집니다. 신용카드도 필요 없습니다. 속도 제한은 시간당 200파일, 연속 3회 리뷰 후 시간당 4회입니다. PR 을 연달아 여러 개 올리면 "Review rate limited" 가 뜨는데, 혼자 작업에서는 평소 닿지 않는 수준입니다.
 
-설정은 `.coderabbit.yaml` 에 들어 있어서 따로 할 일은 없습니다.
+설정은 `.coderabbit.yaml` 에 들어 있어서 따로 할 일은 없습니다. 다만 이 파일에서 **기본값을 끄는 작업이 절반** 이었습니다.
+
+#### CodeRabbit 의 기본값은 코드를 직접 씁니다
+
+`reviews.finishing_touches` 블록이 문제였습니다. 하위 항목 여섯 개 중 다섯 개가 기본값 `true` 이고, 전부 코드를 생성하거나 커밋합니다.
+
+| 항목 | 기본값 | 하는 일 |
+|---|---|---|
+| `docstrings` | true | docstring 을 작성해 넣음 |
+| `unit_tests` | true | 단위 테스트를 생성 |
+| `autofix` | true | 지적한 것을 자동 수정 |
+| `fix_ci` | true | CI 실패를 수정 |
+| `resolve_merge_conflict` | true | 충돌을 해결 |
+| `simplify` | false | 코드를 단순화 |
+
+ADR 0004 는 리뷰어가 **수정안을 제시** 하는 것도 막습니다. 그런데 이 기능들은 제시를 넘어 **코드를 커밋** 합니다. 하나라도 켜져 있으면 하네스 전체가 무의미해집니다. 전부 `false` 로 명시했습니다.
+
+기본값에 기대지 않고 명시적으로 끈 이유는, 나중에 CodeRabbit 이 기본값을 바꾸거나 항목을 추가했을 때 조용히 켜지는 것을 막기 위해서입니다.
+
+#### 나머지 설정
+
+| 설정 | 값 | 이유 |
+|---|---|---|
+| `language` | `ko` | 리뷰를 한국어로 |
+| `profile` | `assertive` | 학습 목적이라 지적이 많은 쪽이 낫다 |
+| `collapse_walkthrough` | `false` | 워크스루가 학습 저장소에서는 읽을 거리다 |
+| `sequence_diagrams` | `true` | 변경 흐름을 그림으로 보는 게 이 프로젝트 목적에 맞다 |
+| `poem` | `false` | 리뷰에 시가 붙는 기본 동작을 끔 |
+| `suggested_reviewers` | `false` | 1인 프로젝트 |
+| `path_filters` | `reference/`, 다이어그램 제외 | 원본 코드에 리뷰가 달리면 노이즈 |
+| `tools.gitleaks` | `true` | 비밀값 커밋 감지 |
+| `tools.languagetool`, `markdownlint` | `false` | 한국어 문서에 오탐이 많다 |
+| `knowledge_base.code_guidelines` | `AGENTS.md`, `docs/adr/*.md` | 리뷰어가 ADR 을 규칙으로 읽게 함 |
+
+`knowledge_base.code_guidelines` 가 유용합니다. CodeRabbit 이 `AGENTS.md` 와 ADR 을 읽어서 "이 변경이 ADR 0003 을 위반한다" 같은 지적을 할 수 있게 됩니다. Codex 도 같은 `AGENTS.md` 를 읽으니, **리뷰어 셋 중 둘이 같은 파일을 규칙으로 봅니다.**
+
+#### 경로별 담당
+
+| 경로 | 보게 한 것 |
+|---|---|
+| `**/*.java` | 데이터 유실, 버퍼 크기 계산, 문자 수와 바이트 수 혼동, 예외를 삼키고 성공을 돌려주는 패턴 |
+| `**/*Test.java` | 어서션 없는 테스트, 실패를 통과로 바꾸는 구조, 구현을 베낀 기대값 |
+| `simulation/**` | 비결정성의 원천. 여기서는 반대로 `Thread.sleep` 허용을 알려줌 |
+| `docs/**/*.md` | 사실 오류와 논리적 모순만. 문장 다듬기 금지 |
+| `.github/**` | 트리거가 의도와 맞는지, **성공으로 끝나는데 산출물이 없는 경로가 있는지** |
+
+`.github/**` 의 마지막 항목은 이 하네스를 세우며 겪은 세 함정에서 나왔습니다. 같은 실수를 다시 하면 리뷰어가 잡아주게 해둔 것입니다.
+
+#### 머지 전 검사
+
+`pre_merge_checks` 로 두 가지를 봅니다. 제목이 한국어 평서문이고 긴 대시가 없는지, 그리고 PR 본문의 "이 변경이 주장하는 보장" 항목이 실제로 채워졌는지입니다. 후자는 적대적 검증자의 공격 목표라서 비어 있으면 검증 자체가 불가능해집니다.
+
+본문과 docstring 검사는 `off` 로 껐습니다. 학습 게이트가 이미 기계적으로 보기 때문에 중복입니다. **YAML 에서 `off` 는 불리언 `false` 로 해석되므로 `"off"` 로 인용해야 합니다.**
 
 ### 4. 브랜치 보호
 
