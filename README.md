@@ -79,7 +79,7 @@ Level 4를 구현하지 않는 이유는 [ADR 0002](docs/adr/0002-stop-at-level-
 | 층 | 언제 | 무엇 |
 |---|---|---|
 | 기계 게이트 | PR마다 | 학습 절차 검사, 빌드, 짧은 시드 스윕 |
-| 다관점 AI 리뷰 | PR마다 | Claude(개념 갭) + CodeRabbit + Gemini |
+| 다관점 AI 리뷰 | PR 열 때 + `/review` | Claude(개념 갭, 개인 구독) + CodeRabbit(무료) |
 | 적대적 검증 | `/adversary` 코멘트 | 반례 사냥 |
 | 로컬 커맨드 | 구현 전후 | `/design-review`, `/adversary`, `/explain-check`, `/kafka-diff`, `/second-opinion` |
 | 커리큘럼 검토 | 주 1회 | 커리큘럼 자체의 빈틈을 이슈로 |
