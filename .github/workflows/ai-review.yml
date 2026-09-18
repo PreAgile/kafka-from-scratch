@@ -57,7 +57,6 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
           use_sticky_comment: true
-          show_full_output: true
           claude_args: |
             --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
 
@@ -99,6 +98,5 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
-          show_full_output: true
           claude_args: |
             --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
