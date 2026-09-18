@@ -48,15 +48,32 @@ PR 템플릿의 첫 칸이 `## 백지 설명` 입니다. 코드를 보지 않고
 
 서로 다른 계보의 모델을 셋 붙입니다. **같은 모델에게 두 번 물으면 같은 사각지대가 두 번 나오기 때문** 입니다.
 
-| 리뷰어 | 역할 | 실제 비용 | 설정 |
+| 리뷰어 | 역할 | 실제 비용 | 규칙을 주는 곳 |
 |---|---|---|---|
-| Claude (개념 갭) | 백지 설명과 코드의 괴리, 빠진 개념, 검증 안 된 불변식 | 개인 구독 사용량 차감 | `claude setup-token` |
-| CodeRabbit | 일반 코드 품질, 버그, 라인별 코멘트 | 공개 저장소 무료 | GitHub App 설치 |
-| Codex (로컬) | 다른 계보의 교차 검증 | 기존 Codex CLI | `/second-opinion` |
+| Claude | 백지 설명과 코드의 괴리, 빠진 개념, 검증 안 된 불변식 | Claude 개인 구독 차감 | `.github/review-prompts/concept-gap.md` |
+| Codex | 불변식 공격, 데이터 유실 시나리오 | ChatGPT 개인 구독 차감 | `AGENTS.md` 의 `## Code Review Rules` |
+| CodeRabbit | 코드 품질, 실제 버그, 라인별 코멘트 | 공개 저장소 무료 | `.coderabbit.yaml` |
 
-역할이 겹치지 않게 나눠 두었습니다. Claude 는 개념과 설명의 괴리만 보고 스타일과 네이밍은 아예 보지 말라고 프롬프트에 박아 두었습니다. 그건 CodeRabbit 이 합니다.
+셋 다 계보가 다른 모델입니다. 같은 모델에 두 번 물으면 같은 사각지대가 두 번 나오기 때문에 이게 요점입니다.
 
-세 번째 관점을 클라우드 봇이 아니라 **로컬 Codex** 로 둔 이유는 아래 "검토했다가 뺀 것" 에 적었습니다.
+역할이 겹치지 않게 나눠 두었습니다. Claude 와 Codex 는 스타일과 네이밍을 아예 보지 말라고 지시해 두었고, 그건 CodeRabbit 이 합니다. 반대로 CodeRabbit 은 개념과 설명의 괴리를 보지 않습니다.
+
+**세 리뷰어 전부에게 같은 제약을 걸었습니다.** 수정안 생성 금지입니다. 각자 규칙을 읽는 위치가 달라서 세 곳에 따로 박아야 했습니다.
+
+- Claude: 워크플로가 `.github/review-prompts/` 의 프롬프트를 주입
+- Codex: 공식 문서대로 `AGENTS.md` 의 `## Code Review Rules` 섹션을 읽습니다. `@codex fix` 요청이 와도 수정안을 만들지 말라고 명시해 두었습니다
+- CodeRabbit: `.coderabbit.yaml` 의 `tone_instructions` 와 경로별 `path_instructions`
+
+CodeRabbit 의 경로별 지시는 이렇게 나눠 두었습니다.
+
+| 경로 | 무엇을 보게 했는가 |
+|---|---|
+| `**/*.java` | 데이터 유실과 조용한 손상. 버퍼 크기 계산, 문자 수와 바이트 수 혼동, 길이 필드를 믿고 allocate 하는 것 |
+| `simulation/**` | 비결정성의 원천. HashMap 순회 순서, 스레드 스케줄링 의존, 시드 없는 난수 |
+| `docs/**/*.md` | 기술적 사실 오류와 논리적 모순만. 문장 다듬기 금지 |
+| `.github/**` | 트리거가 의도와 맞는지, 시크릿이 로그로 새지 않는지 |
+
+`reference/` 는 리뷰 대상에서 제외했습니다. 원본 코드에 리뷰가 달리면 노이즈입니다.
 
 ### Claude 리뷰를 언제 도는지
 
@@ -72,7 +89,7 @@ PR 템플릿의 첫 칸이 `## 백지 설명` 입니다. 코드를 보지 않고
 - 개인 무료 등급의 PR 리뷰 할당량이 명확히 문서화되어 있지 않습니다. 월 8건이라는 이야기가 돌지만 공식 문서에서 숫자를 확인하지 못했습니다
 - 저장소 하나 붙이자고 GCP 프로젝트와 결제 계정을 만드는 비용이 얻는 것보다 큽니다
 
-나중에 Preview 가 풀리고 조건이 명확해지면 다시 검토합니다. 지금은 세 번째 관점을 로컬 Codex 로 대신합니다. 이미 설치되어 있고, 추가 설정이 없고, 무엇보다 **다른 계보의 모델** 이라는 원래 목적을 그대로 만족합니다.
+나중에 Preview 가 풀리고 조건이 명확해지면 다시 검토합니다. 세 번째 관점은 Codex 로 채웠습니다. ChatGPT 개인 구독으로 되고, 결제 계정을 새로 만들 필요가 없고, 무엇보다 **다른 계보의 모델** 이라는 원래 목적을 그대로 만족합니다.
 
 ### 층 2. 적대적 검증 (요청할 때만)
 
@@ -138,13 +155,35 @@ gh secret set CLAUDE_CODE_OAUTH_TOKEN -R PreAgile/kafka-from-scratch
 
 시크릿이 없으면 AI 리뷰 잡은 **조용히 건너뜁니다.** 층 0 의 기계 게이트는 그대로 돕니다.
 
-### 2. CodeRabbit 설치
+### 2. Codex 리뷰 켜기
 
-https://github.com/apps/coderabbitai 에서 이 저장소 하나만 선택해 설치합니다.
+워크플로 파일이 아니라 설정 페이지에서 켭니다. GitHub Actions 를 쓰지 않으므로 시크릿도 필요 없습니다.
 
-공개 저장소는 신청이나 승인 대기 없이 Pro 기능이 무료로 켜집니다. 신용카드도 필요 없습니다. 속도 제한은 시간당 200파일, 연속 3회 리뷰 후 시간당 4회입니다. 혼자 하는 프로젝트에서는 닿을 일이 없는 수준입니다.
+1. https://chatgpt.com/codex/settings/code-review 로 갑니다
+2. `PreAgile/kafka-from-scratch` 에 Code review 를 켭니다 (저장소 push 또는 admin 권한 필요)
+3. 자동 리뷰를 원하면 Automatic reviews 를 켭니다. 끄면 PR 에 `@codex review` 로 요청할 때만 돕니다
 
-### 3. 브랜치 보호
+트리거는 세 가지입니다.
+
+| 코멘트 | 하는 일 |
+|---|---|
+| `@codex review` | 일반 리뷰 |
+| `@codex security review` | 보안 중심 (research preview) |
+| `@codex fix ...` | **쓰지 마십시오.** `AGENTS.md` 에서 수정안 생성을 금지했지만 애초에 요청하지 않는 게 맞습니다 |
+
+리뷰 규칙은 저장소의 `AGENTS.md` 의 `## Code Review Rules` 섹션에서 읽습니다. 루트 `AGENTS.md` 와 변경된 파일에 가장 가까운 `AGENTS.md` 를 함께 적용합니다. 나중에 `log-engine/AGENTS.md` 같은 하위 파일을 두면 그 디렉터리에만 적용되는 규칙을 더할 수 있습니다.
+
+ChatGPT 개인 구독 사용량에서 차감됩니다. Claude 와 마찬가지로, 리뷰를 여러 번 받을수록 로컬에서 쓸 몫이 줄어듭니다.
+
+### 3. CodeRabbit
+
+이미 설치되어 있습니다. PR #25 에서 자동으로 붙어 코멘트를 남기는 것을 확인했습니다.
+
+공개 저장소는 신청이나 승인 대기 없이 Pro 기능이 무료로 켜집니다. 신용카드도 필요 없습니다. 속도 제한은 시간당 200파일, 연속 3회 리뷰 후 시간당 4회입니다. PR 을 연달아 여러 개 올리면 "Review rate limited" 가 뜨는데, 혼자 작업에서는 평소 닿지 않는 수준입니다.
+
+설정은 `.coderabbit.yaml` 에 들어 있어서 따로 할 일은 없습니다.
+
+### 4. 브랜치 보호
 
 ```bash
 gh api -X PUT repos/PreAgile/kafka-from-scratch/branches/main/protection \
@@ -165,7 +204,7 @@ gh api -X PUT repos/PreAgile/kafka-from-scratch/branches/main/protection \
 5. /adversary          로컬. 반례 사냥
 6. PR 을 올린다         백지 설명을 채운다
      → 층 0 기계 게이트
-     → 층 1 Claude 개념 갭 + CodeRabbit
+     → 층 1 Claude(개념 갭) + Codex(불변식 공격) + CodeRabbit(코드 품질)
 7. /adversary 코멘트    필요하면 PR 에서 한 번 더
 8. /explain-check      로컬. 설명 가능한 상태인지 판정
 9. /kafka-diff         실제 Kafka 와 대조, docs/notes/ 에 기록
@@ -179,5 +218,6 @@ gh api -X PUT repos/PreAgile/kafka-from-scratch/branches/main/protection \
 정직하게 적어둡니다.
 
 - **AI 리뷰는 틀립니다.** 특히 분산 시스템의 타이밍 문제에서 그럴듯하지만 실제로는 일어날 수 없는 시나리오를 잘 만듭니다. 그래서 `/adversary` 는 반례를 **테스트로 재현해서 실패를 확인** 하게 했습니다. 재현 안 되는 반례는 버립니다.
-- **여러 리뷰어가 같은 것을 지적하면 신호가 아니라 노이즈일 수 있습니다.** 비슷한 데이터를 봤기 때문입니다. 진짜 신호는 한쪽만 지적한 것 중에 재현되는 것입니다. Claude 와 Codex 가 갈리는 지점이 특히 볼 만합니다.
+- **셋이 같은 것을 지적하면 신호가 아니라 노이즈일 수 있습니다.** 비슷한 데이터를 봤기 때문입니다. 진짜 신호는 한쪽만 지적한 것 중에 재현되는 것입니다. Claude 와 Codex 의 판단이 갈리는 지점이 특히 볼 만합니다.
+- **구독 사용량이 두 군데서 빠집니다.** Claude 리뷰는 Claude 구독, Codex 리뷰는 ChatGPT 구독에서 차감됩니다. 리뷰를 습관적으로 여러 번 돌리면 정작 구현할 때 쓸 몫이 줄어듭니다. 자동 트리거를 최소로 둔 이유입니다.
 - **게이트를 우회하고 싶어지는 순간이 옵니다.** 그때가 이 프로젝트가 실패하는 지점입니다. 게이트를 고치지 말고 절차를 지키거나, 절차가 정말 틀렸다면 ADR 을 쓰고 고치세요.
