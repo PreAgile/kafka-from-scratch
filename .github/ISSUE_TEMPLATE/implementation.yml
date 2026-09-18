@@ -1,0 +1,38 @@
+name: 구현 작업
+description: 레벨 커리큘럼의 구현 항목 하나
+labels: ["implementation"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 배경
+      description: 원본의 어떤 결함을 메우는가. docs/00-analysis 의 해당 항목을 링크한다.
+      placeholder: |
+        docs/00-analysis/02-missing-features.md 의 A-1 항목.
+        원본은 프레이밍이 없어서 요청이 TCP 경계에서 쪼개지면 깨진다.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 먼저 쓸 재현 테스트
+      description: 구현 전에 실패하는 것을 눈으로 볼 테스트. 이 칸이 비어 있으면 작업을 시작하지 않는다.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 완료 조건
+      value: |
+        - [ ] 재현 테스트 작성, 실패 확인
+        - [ ] 구현
+        - [ ] 테스트 통과
+        - [ ] 에이전트 적대적 검증 통과
+        - [ ] ADR 작성 (결정이 있었다면)
+    validations:
+      required: true
+  - type: textarea
+    id: kafka
+    attributes:
+      label: 실제 Kafka는 어떻게 하는가
+      description: 대조 결과. 구현 후에 채워도 된다.

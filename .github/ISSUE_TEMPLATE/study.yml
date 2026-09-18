@@ -1,0 +1,24 @@
+name: 학습 항목
+description: 구현하지 않고 읽고 정리만 하는 주제
+labels: ["study"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 답하려는 질문
+      description: "백지에서 설명할 수 있어야 하는 질문 형태로 쓴다."
+      placeholder: "리밸런싱은 왜 stop-the-world 였고, cooperative 방식은 무엇을 바꿨는가"
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: 읽을 것
+      description: Kafka 소스 경로, KIP 번호, 논문
+  - type: textarea
+    id: output
+    attributes:
+      label: 산출물
+      value: |
+        - [ ] docs/notes/ 에 정리
+        - [ ] 다이어그램 (필요한 경우)
