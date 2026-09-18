@@ -44,6 +44,19 @@ simulation/         결정론적 장애 시뮬레이터
 
 Level 4를 구현하지 않는 이유는 [ADR 0002](docs/adr/0002-stop-at-level-3.md)에 적었습니다.
 
+작업 단위는 [이슈](https://github.com/PreAgile/kafka-from-scratch/issues)로 쪼개 두었고, 진행 상황은 [프로젝트 보드](https://github.com/users/PreAgile/projects/4)에서 봅니다. 이슈 하나가 PR 하나에 대응합니다.
+
+## 다이어그램
+
+핵심 개념 네 가지는 `docs/diagrams/`에 Excalidraw로 그려 두었습니다. 보는 것이 목적이 아니라 **백지에서 다시 그리는 것**이 목적입니다.
+
+| 다이어그램 | 다루는 개념 |
+|---|---|
+| [세그먼트 레이아웃](docs/diagrams/01-log-segment-layout.excalidraw) | 파일명이 곧 베이스 오프셋인 이유, 길이 프리픽스 레코드, 고정 크기 인덱스 |
+| [produce 경로](docs/diagrams/02-produce-path.excalidraw) | 메시지 한 건의 전체 경로, fire-and-forget 복제가 acks=1을 만드는 이유 |
+| [ISR과 High Watermark](docs/diagrams/03-isr-high-watermark.excalidraw) | LEO와 HW의 차이, acks=all + min.insync.replicas=1의 함정 |
+| [리더 에포크](docs/diagrams/04-leader-epoch-truncation.excalidraw) | 스플릿 브레인에서 로그가 갈라지는 과정과 truncation |
+
 ## 진행 방식
 
 한 사이클은 이렇게 돕니다.
