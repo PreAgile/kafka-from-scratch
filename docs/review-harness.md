@@ -230,6 +230,71 @@ claude_args: |
 
 교훈은 일반적입니다. **워크플로가 success 인데 산출물이 없으면 권한 거부를 먼저 의심하십시오.** 거부는 잡을 실패시키지 않습니다.
 
+## 겪은 함정 둘: 코멘트로 트리거되는 워크플로는 기본 브랜치 것이 돈다
+
+위 문제를 고쳐 브랜치에 푸시하고, 그 PR 에 `/review` 코멘트를 남겨 재검증했습니다. 그런데 거부가 계속 났습니다.
+
+원인은 이랬습니다. `issue_comment` 이벤트로 트리거되는 워크플로는 **항상 기본 브랜치(main)의 워크플로 파일을 실행합니다.** PR 브랜치에 아무리 고쳐 넣어도 코멘트 트리거는 그 수정을 보지 못합니다. 실행 기록에도 `branch=main` 으로 찍힙니다.
+
+이건 GitHub 의 의도된 동작이고 보안상 그래야 합니다. 그렇지 않으면 외부인이 PR 을 열어 워크플로를 고친 뒤 코멘트 하나로 그걸 실행시킬 수 있습니다.
+
+실무적인 결론은 이렇습니다.
+
+| 트리거 | 어느 브랜치의 워크플로가 도는가 | 검증 방법 |
+|---|---|---|
+| `pull_request` | PR 브랜치 | PR 브랜치에서 바로 확인 가능 |
+| `issue_comment`, `schedule`, `workflow_dispatch` | 항상 기본 브랜치 | **main 에 머지한 뒤에만 검증 가능** |
+
+`/review`, `/adversary`, 야간 스윕, 주간 커리큘럼 검토는 전부 두 번째 부류입니다. 이들의 워크플로를 고쳤다면 main 에 들어간 다음에야 실제 동작을 확인할 수 있습니다. 브랜치에서 아무리 돌려봐도 구버전이 돕니다.
+
+## 겪은 함정 셋: track_progress 는 워크플로가 기본 브랜치와 같아야 돈다
+
+`track_progress: true` 를 넣고 다시 돌렸더니 이번엔 잡이 5초 만에 끝났습니다. Claude 가 아예 실행되지 않았습니다. 로그에 이유가 그대로 있었습니다.
+
+```
+Auto-detected mode: tag for event: pull_request
+Skipping action due to workflow validation: Workflow validation failed.
+The workflow file must exist and have identical content to the version on
+the repository's default branch.
+...
+your workflow will begin working once you merge your PR.
+```
+
+`track_progress` 를 켜면 액션이 **워크플로 파일이 기본 브랜치의 것과 바이트 단위로 같은지** 검사합니다. PR 에서 워크플로를 고치면 그 PR 에서는 액션이 스스로 건너뜁니다.
+
+이것도 의도된 보안 동작입니다. 이 모드에서 액션은 앱 토큰을 받아 PR 에 코멘트를 쓸 권한을 얻습니다. 워크플로를 고친 PR 에서 그대로 실행된다면, 외부인이 워크플로를 바꿔 그 권한을 탈취할 수 있습니다.
+
+### 세 함정이 만든 사슬
+
+세 개가 순서대로 겹쳐서 진단이 길어졌습니다.
+
+| 순서 | 증상 | 원인 | 로그의 단서 |
+|---|---|---|---|
+| 1 | success 인데 코멘트 없음 | `--allowedTools` 허용 목록이 코멘트 게시 도구를 제외 | `permission_denials_count: 9` |
+| 2 | 거부 목록으로 바꿔도 여전히 없음 | `track_progress` 가 꺼져서 코멘트용 MCP 도구가 애초에 없음 | SDK 옵션에 `mcpServers` 부재 |
+| 3 | `track_progress` 를 켜니 5초 만에 종료 | 워크플로를 고친 PR 이라 액션이 자체 검증에서 스킵 | `Workflow validation failed` |
+
+공통점이 하나 있습니다. **세 번 다 워크플로는 `success` 였습니다.** 권한 거부도, 자체 스킵도 잡을 실패시키지 않습니다.
+
+### 그래서 지켜야 하는 검증 순서
+
+리뷰 워크플로를 수정했다면 이 순서 말고는 검증할 방법이 없습니다.
+
+1. 워크플로 수정을 PR 로 올린다. **그 PR 에서는 리뷰가 안 돈다.** 정상이다
+2. main 에 머지한다
+3. **워크플로를 건드리지 않는** 별도의 PR 을 열어서 확인한다
+
+2번을 건너뛰고 브랜치에서 아무리 돌려봐도 영원히 안 됩니다. 함정 둘(코멘트 트리거는 기본 브랜치 것이 돈다)과 합치면, 리뷰 하네스는 **main 에 들어간 뒤에만 검증 가능** 하다는 결론이 됩니다.
+
+### 판별법
+
+워크플로가 `success` 인데 리뷰가 없을 때 로그에서 이 순서로 찾으십시오.
+
+1. `Workflow validation failed` 가 있으면 함정 셋. 머지하면 됩니다
+2. `permission_denials_count` 가 0 이 아니면 도구 권한 문제
+3. `SDK options` 에 `mcpServers` 가 없으면 `track_progress` 문제
+4. 셋 다 아니면 그때 프롬프트를 의심하십시오
+
 ## 이 하네스의 한계
 
 정직하게 적어둡니다.
