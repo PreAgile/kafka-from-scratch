@@ -2,7 +2,7 @@ name: ai-review
 
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [opened, reopened, ready_for_review]
   issue_comment:
     types: [created]
   pull_request_review_comment:
@@ -55,7 +55,9 @@ jobs:
           prompt: ${{ steps.prompt.outputs.text }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
           use_sticky_comment: true
+          show_full_output: true
           claude_args: |
             --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
 
@@ -96,5 +98,7 @@ jobs:
           prompt: ${{ steps.prompt.outputs.text }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          show_full_output: true
           claude_args: |
             --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
